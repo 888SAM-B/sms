@@ -4,29 +4,18 @@ import {
   LayoutDashboard, 
   Package, 
   Plus, 
-  TrendingUp, 
   AlertTriangle,
   Calendar,
   DollarSign,
   Tags,
   Settings,
   Wifi,
-  WifiOff
+  WifiOff,
+  AlertCircle,
+  ArrowRight
 } from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell
-} from 'recharts';
 
-import { Product, ViewMode, InventoryStats, DEFAULT_CATEGORIES } from './types';
+import { Product, ViewMode, InventoryStats } from './types';
 import { InventoryList } from './components/InventoryList';
 import { StockForm } from './components/StockForm';
 import { StatsCard } from './components/StatsCard';
@@ -105,22 +94,23 @@ function App() {
     }, { totalItems: 0, totalValue: 0, lowStockCount: 0, expiredCount: 0, expiringSoonCount: 0 });
   }, [products]);
 
-  // Chart Data
-  const categoryData = useMemo(() => {
-    const groups: {[key: string]: number} = {};
-    products.forEach(p => {
-      groups[p.category] = (groups[p.category] || 0) + p.quantity;
-    });
-    return Object.entries(groups).map(([name, value]) => ({ name, value }));
-  }, [products]);
+  // Derived Lists for Dashboard
+  const alertItems = useMemo(() => {
+    const today = new Date();
+    const warningDate = new Date();
+    warningDate.setDate(today.getDate() + 30);
 
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
+    return products.filter(p => {
+      const expDate = new Date(p.expiryDate);
+      return p.quantity < 10 || expDate < warningDate;
+    }).sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
+  }, [products]);
 
   // Handlers
   const handleAddProduct = async (newProduct: Omit<Product, 'id'>) => {
     const product: Product = {
       ...newProduct,
-      id: Math.random().toString(36).substr(2, 9) // In a real DB, DB generates ID, but this works for hybrid
+      id: Math.random().toString(36).substr(2, 9) 
     };
     await storageService.saveProduct(product);
     setProducts([...products, product]);
@@ -157,19 +147,14 @@ function App() {
   };
 
   const handleEditCategory = async (oldName: string, newName: string) => {
-    // This is complex in NoSQL/Hybrid, so we:
-    // 1. Add new category
     await storageService.addCategory(newName);
-    // 2. Delete old category
     await storageService.deleteCategory(oldName);
-    // 3. Update all products using old category
     const affectedProducts = products.filter(p => p.category === oldName);
     for (const p of affectedProducts) {
       const updated = { ...p, category: newName };
       await storageService.saveProduct(updated);
     }
     
-    // Update local state
     setCategories(categories.map(c => c === oldName ? newName : c));
     setProducts(products.map(p => 
       p.category === oldName ? { ...p, category: newName } : p
@@ -318,51 +303,81 @@ function App() {
           {/* View: Dashboard */}
           {viewMode === 'dashboard' && (
             <div className="space-y-6 animate-in fade-in duration-500">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Category Chart */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-2">
-                  <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-slate-400" />
-                    Stock Distribution
+              {/* Action Needed Section */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                  <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-orange-500" />
+                    Needs Attention
                   </h3>
-                  <div className="h-64 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={categoryData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                        <Tooltip 
-                          cursor={{fill: '#f8fafc'}}
-                          contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
-                        />
-                        <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                  <button 
+                    onClick={() => setViewMode('inventory')}
+                    className="text-sm text-brand-600 hover:text-brand-700 font-medium flex items-center gap-1"
+                  >
+                    View All Inventory <ArrowRight size={14} />
+                  </button>
+                </div>
+                
+                {alertItems.length === 0 ? (
+                  <div className="p-8 text-center text-slate-500">
+                    <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Package size={24} />
+                    </div>
+                    <p className="font-medium text-slate-800">Everything looks good!</p>
+                    <p className="text-sm">No low stock or expiring items.</p>
                   </div>
-                </div>
-
-                {/* Pie Chart / Quick Actions */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                   <h3 className="text-lg font-bold text-slate-800 mb-6">Composition</h3>
-                   <div className="h-64 w-full flex items-center justify-center">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={categoryData}
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={5}
-                          dataKey="value"
-                        >
-                          {categoryData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                   </div>
-                </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-50 text-slate-500 font-medium">
+                        <tr>
+                          <th className="px-6 py-3">Product</th>
+                          <th className="px-6 py-3">Issue</th>
+                          <th className="px-6 py-3 text-right">Qty</th>
+                          <th className="px-6 py-3">Expiry</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {alertItems.slice(0, 5).map(item => {
+                          const isExpired = new Date(item.expiryDate) < new Date();
+                          const isLowStock = item.quantity < 10;
+                          
+                          return (
+                            <tr key={item.id} className="hover:bg-slate-50">
+                              <td className="px-6 py-3 font-medium text-slate-800">{item.name}</td>
+                              <td className="px-6 py-3">
+                                <div className="flex gap-2">
+                                  {isExpired && (
+                                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+                                      Expired
+                                    </span>
+                                  )}
+                                  {!isExpired && new Date(item.expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && (
+                                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
+                                      Expiring Soon
+                                    </span>
+                                  )}
+                                  {isLowStock && (
+                                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 border border-yellow-200">
+                                      Low Stock
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-3 text-right font-mono text-slate-600">{item.quantity}</td>
+                              <td className="px-6 py-3 text-slate-600 font-mono">{item.expiryDate}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    {alertItems.length > 5 && (
+                      <div className="p-3 text-center border-t border-slate-100 bg-slate-50/50 text-xs text-slate-500">
+                        + {alertItems.length - 5} more items require attention
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
