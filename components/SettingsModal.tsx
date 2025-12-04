@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { X, Database, Save, LogOut } from 'lucide-react';
+import { X, Database, Save, LogOut, HelpCircle } from 'lucide-react';
 import { storageService } from '../services/storage';
 
 interface SettingsModalProps {
@@ -55,8 +56,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
 
         <div className="p-6 space-y-4">
           <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 text-sm text-blue-800">
-            <p className="font-semibold mb-1">Connect to Supabase (Cloud)</p>
-            <p>Enter your project credentials to store data permanently in the cloud. If left empty, data is stored only on this device.</p>
+            <p className="font-semibold mb-1 flex items-center gap-2">
+              <Database size={16} />
+              Connect to Supabase (Cloud)
+            </p>
+            <p className="opacity-90">Enter your project credentials to store data permanently in the cloud. If left empty, data is stored only on this device.</p>
           </div>
 
           <div>
@@ -71,14 +75,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">API Key (Anon/Public)</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-slate-700">Publishable Key</label>
+              <span className="text-xs text-slate-400 flex items-center gap-1">
+                <HelpCircle size={10} />
+                Found in API Settings
+              </span>
+            </div>
             <input
               type="password"
               value={key}
               onChange={(e) => setKey(e.target.value)}
-              placeholder="eyJxh..."
+              placeholder="sb_publishable_..."
               className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none transition-all text-sm"
             />
+            <p className="mt-1 text-xs text-slate-400">
+              Paste the key starting with <code>sb_publishable_</code> here.
+            </p>
           </div>
 
           <div className="pt-4 flex gap-3">
