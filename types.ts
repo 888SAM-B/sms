@@ -17,7 +17,7 @@ export interface InventoryStats {
   expiringSoonCount: number; // Within 30 days
 }
 
-export type ViewMode = 'dashboard' | 'inventory';
+export type ViewMode = 'dashboard' | 'inventory' | 'billing';
 
 export enum SortField {
   NAME = 'name',
